@@ -1,0 +1,3 @@
+add_library(add_edge_cmd INTERFACE)
+target_include_directories(add_edge_cmd INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(add_edge_cmd INTERFACE i_command)

@@ -1,0 +1,3 @@
+add_library(delete_edge_cmd INTERFACE)
+target_include_directories(delete_edge_cmd INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(delete_edge_cmd INTERFACE i_command)

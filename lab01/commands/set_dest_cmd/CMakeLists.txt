@@ -1,0 +1,3 @@
+add_library(set_dest_cmd INTERFACE)
+target_include_directories(set_dest_cmd INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(set_dest_cmd INTERFACE i_command)

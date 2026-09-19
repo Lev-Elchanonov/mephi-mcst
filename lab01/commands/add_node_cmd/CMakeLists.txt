@@ -1,0 +1,3 @@
+add_library(add_vertex_cmd INTERFACE)
+target_include_directories(add_vertex_cmd INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(add_vertex_cmd INTERFACE i_command)

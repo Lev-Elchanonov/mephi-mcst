@@ -1,0 +1,3 @@
+add_library(visualize_cmd INTERFACE)
+target_include_directories(visualize_cmd INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(visualize_cmd INTERFACE i_command)

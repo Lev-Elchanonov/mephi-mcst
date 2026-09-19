@@ -1,0 +1,3 @@
+add_library(delete_node_cmd INTERFACE)
+target_include_directories(delete_node_cmd INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(delete_node_cmd INTERFACE i_command)

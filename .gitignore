@@ -1,0 +1,8 @@
+build/
+buildDir/
+build-debug/
+build-release/
+build-*/
+cmake-build-*/
+.idea/
+.vscode/
