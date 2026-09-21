@@ -48,8 +48,8 @@ TEST_F(tree_test, add_inicominng_edge_to_root) {
     tree_.add_node("Z");
     auto Z = tree_.find_node("Z");
     auto A = tree_.find_node("A");
-
-    EXPECT_DEATH(tree_.add_edge(Z, A, 3), "Error: root can not have incoming edges");
+    tree_.add_edge(Z, A, 3);
+    EXPECT_DEATH(tree_.check_validation(), "Error: root can not have incoming edges");
 }
 
 
@@ -64,7 +64,8 @@ TEST_F(tree_test, Tree_add_back_edge_creates_loop) {
     ASSERT_NE(A, tree_.nend());
 
     // тут backedge
-    EXPECT_DEATH(tree_.add_edge(D, A, 99), "Error: tree can not have loops" );
+    tree_.add_edge(D, A, 99);
+    EXPECT_DEATH(tree_.check_validation(), "Error: tree can not have loops" );
 }
 
 TEST_F(tree_test, delete_root) {

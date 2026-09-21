@@ -36,6 +36,7 @@ namespace graph {
     constexpr bool valid_data_v = std::is_void_v<T> || (std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>);
 
     template < typename Tnode_data, typename Tedge_data,
+               bool check_modify = true,
                typename = std::enable_if_t<valid_data_v<Tnode_data> && valid_data_v<Tedge_data>>>
     class orgraph_t {
     public:
@@ -147,7 +148,11 @@ namespace graph {
                 nodes_.emplace_back(std::forward<Args>(args)...);
                 auto it = std::prev(nodes_.end());
 
-                orgraph_t::check_validation();
+#ifdef DEBUG
+                if constexpr ( check_modify )
+                    check_validation();
+#endif
+
                 return it;
             } else { // если есть
                 node_t new_node( std::forward<Args>(args)... );
@@ -161,7 +166,10 @@ namespace graph {
                 nodes_.push_back(std::move(new_node));
                 auto it = std::prev(nodes_.end());
 
-                orgraph_t::check_validation();
+#ifdef DEBUG
+                if constexpr ( check_modify )
+                    check_validation();
+#endif
                 return it;
             }
         }
@@ -185,8 +193,10 @@ namespace graph {
             dest->incoming_edges_.push_back(edge_iter);
 
 
-
-            check_validation();
+#ifdef DEBUG
+            if constexpr ( check_modify )
+                check_validation();
+#endif
             return edge_iter;
         }
 
@@ -200,7 +210,10 @@ namespace graph {
             new_src->outgoing_edges_.push_back(edge);
 
 
-            check_validation();
+#ifdef DEBUG
+            if constexpr ( check_modify )
+                check_validation();
+#endif
         }
 
         void set_dest(edge_iterator edge, node_iterator new_dest) {
@@ -214,7 +227,10 @@ namespace graph {
             new_dest->incoming_edges_.push_back(edge);
 
 
-            check_validation();
+#ifdef DEBUG
+            if constexpr ( check_modify )
+                check_validation();
+#endif
         }
 
         void delete_edge(edge_iterator e) {
@@ -226,7 +242,10 @@ namespace graph {
             e->dest_->incoming_edges_.remove(e);
             edges_.erase(e);
 
-            check_validation();
+#ifdef DEBUG
+            if constexpr ( check_modify )
+                check_validation();
+#endif
         }
 
         virtual void delete_node(node_iterator n) {
@@ -242,7 +261,10 @@ namespace graph {
             }
             nodes_.erase(n);
 
-            orgraph_t::check_validation();
+#ifdef DEBUG
+            if constexpr ( check_modify )
+                check_validation();
+#endif
         }
 
         template <typename T = Tnode_data>
@@ -285,7 +307,6 @@ namespace graph {
         }
 
         virtual void check_validation()  {
-#ifdef DEBUG
             // проверка согласования дуг с нодами
             for ( auto node_it = nbegin(); node_it != nend(); ++node_it) {
                 for ( auto e : node_it->incoming_edges() ) {
@@ -309,8 +330,6 @@ namespace graph {
                 assert(std::find(dest_in.begin(), dest_in.end(), it) != dest_in.end()
                         && "Error: edge not in dest's incoming list");
             }
-
-#endif
         }
 
         template <typename Node_label, typename Edge_label>
@@ -344,9 +363,9 @@ namespace graph {
 
 namespace tree {
     template < typename Tnode_data, typename Tedge_data>
-    class tree_t : public graph::orgraph_t<Tnode_data, Tedge_data> {
+    class tree_t : public graph::orgraph_t<Tnode_data, Tedge_data, false > {
     public:
-        using base_t = graph::orgraph_t<Tnode_data, Tedge_data>;
+        using base_t = graph::orgraph_t< Tnode_data, Tedge_data, false >;
         using node_iterator = typename base_t::node_iterator;
         using edge_iterator = typename base_t::edge_iterator;
     private:
@@ -393,16 +412,34 @@ namespace tree {
     public:
         void check_validation() override{
             base_t::check_validation();
-#ifdef DEBUG
             if ( this->get_nodes().empty() && has_root_ == false )
                 return;
 
             assert( has_root_ && "Error: tree must have root" );
+
+
             assert( !has_loop() && "Error: tree can not have loops" );
 
-            assert( root_->incoming_edges().empty() && "Error: root can not have incoming edges");
-#endif
+            size_t roots = 0;
+            for ( auto it = this->nodes_.begin(); it != this->nodes_.end(); ++it ) {
+                if (it->incoming_edges().empty())
+                    roots++;
+            }
+            assert(roots == 1 && "Error: tree must have exactly one root");
 
+            assert( root_->incoming_edges().empty() && "Error: root can not have incoming edges");
+
+            bool all_have_one_inc_edge = true;
+            for ( auto iter = this->nodes_.begin(); iter != this->nodes_.end(); ++iter ) {
+                if ( iter != root_ && iter->incoming_edges().size() != 1 ) {
+                    all_have_one_inc_edge = false;
+                    break;
+                }
+            }
+            assert( all_have_one_inc_edge && "Error: all non-root nodes must have 1 incoming edge");
+
+            auto reachable_nodes = this->dfs(root_);
+            assert( reachable_nodes.size() == this->nodes_.size() && "Error: all nodes have to be reachable from root");
         }
 
         tree_t(node_iterator root) : root_(root), has_root_(true) {}
@@ -417,8 +454,6 @@ namespace tree {
                 root_ = this->nbegin();
                 has_root_ = true;
             }
-
-            check_validation();
 
             return it;
         }

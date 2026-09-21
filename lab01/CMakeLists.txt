@@ -5,21 +5,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(TYPE STREQUAL "Debug")
-    add_compile_definitions(DEBUG)
-    message(STATUS "DEBUG macro defined")
-endif()
-
 add_compile_options(-Wall -Wextra -Wpedantic)
 
+option(ENABLE_SAN "---Enable ASan and UBSan" OFF)
+option(ENABLE_DEBUG "---Define DEBUG macro" OFF)
 
-if(TYPE STREQUAL "Debug")
-    message(STATUS "Enabling ASan and UBSan for debug build")
+if(ENABLE_DEBUG)
+    add_compile_definitions(DEBUG)
+    message(STATUS "---DEBUG macro defined")
+else()
+    message(STATUS "---DEBUG macro disabled")
+endif()
+
+if(ENABLE_SAN)
+    message(STATUS "---Enabling ASan and UBSan")
     add_compile_options(-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address -fsanitize=undefined)
 else()
-    message(STATUS "Sanitizers disabled for non-debug build")
+    message(STATUS "---Sanitizers disabled")
 endif()
+
 
 add_subdirectory(tools)
 add_subdirectory(commands)
