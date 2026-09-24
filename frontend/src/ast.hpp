@@ -3,6 +3,8 @@
 #include <vector>
 
 
+
+
 namespace ast {
     enum class type_kind {
         I32, BOOL, CHAR, VOID, ARRAY, POINTER   // типы данных
@@ -44,8 +46,8 @@ namespace ast {
 
         std::string name_;  // имя переменной
 
-        binary_op bin_op_;  // унарная операция
-        unary_op un_op_;    // бинарная операция
+        binary_op bin_op_ = binary_op::ADD;  // унарная операция
+        unary_op un_op_ = unary_op::NEG;    // бинарная операция
 
         std::shared_ptr<expr> lhs_;
         std::shared_ptr<expr> rhs_;
@@ -79,7 +81,7 @@ namespace ast {
 
         expr_ptr target_;   // куда присваиваем
         expr_ptr value_;    // что присваиваем
-        binary_op assign_op = binary_op::ADD; // какая операция
+        binary_op assign_op_ = binary_op::ADD; // какая операция
 
         expr_ptr condition_; // условия
         std::vector<std::shared_ptr<stmt>> then_body_; // если условие if истинно
