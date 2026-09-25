@@ -16,15 +16,13 @@
 
 
 #undef YY_DECL
-#define YY_DECL yy::Parser::symbol_type yy::lang_lexer::yylex(yy::Parser::location_type* loc)
+#define YY_DECL int yy::lang_lexer::yylex(yy::Parser::semantic_type* yylval, yy::location* loc)
 
-#undef yyterminate
-#define yyterminate() return yy::Parser::make_EOF(*loc)
+
 #define YY_USER_ACTION \
     loc->begin.line = loc->end.line = yylineno; \
     loc->begin.column = 1; \
     loc->end.column = yyleng;
-
 
 int lexical_errors = 0;
 
@@ -41,27 +39,28 @@ WHITESPACE [ \t\r\n]+
 %%
 
 
-"i32"       { return yy::Parser::make_I32(*loc); }
-"bool"      { return yy::Parser::make_BOOL(*loc); }
-"char"      { return yy::Parser::make_CHAR(*loc); }
-"void"      { return yy::Parser::make_VOID(*loc); }
-"ptr$"      { return yy::Parser::make_PTR(*loc); }
+"i32"       { return Token::I32; }
+"bool"      { return Token::BOOL; }
+"char"      { return Token::CHAR; }
+"void"      { return Token::VOID; }
+"ptr$"      { return Token::PTR; }
 
-"if"        { return yy::Parser::make_IF(*loc); }
-"elif"      { return yy::Parser::make_ELIF(*loc); }
-"else"      { return yy::Parser::make_ELSE(*loc); }
-"while"     { return yy::Parser::make_WHILE(*loc); }
-"return"    { return yy::Parser::make_RETURN(*loc); }
-"break"     { return yy::Parser::make_BREAK(*loc); }
-"continue"  { return yy::Parser::make_CONTINUE(*loc); }
+"if"        { return Token::IF; }
+"elif"      { return Token::ELIF; }
+"else"      { return Token::ELSE; }
+"while"     { return Token::WHILE; }
+"return"    { return Token::RETURN; }
+"break"     { return Token::BREAK; }
+"continue"  { return Token::CONTINUE; }
 
 
-"true"      { return yy::Parser::make_BOOL_LIT(true, *loc); }
-"false"     { return yy::Parser::make_BOOL_LIT(false, *loc); }
+"true"      { yylval->build<bool>(true);  return Token::BOOL_LIT; }
+"false"     { yylval->build<bool>(false); return Token::BOOL_LIT; }
 
 "-"?{DIGIT}+ {
     long long v = std::atoll(yytext);
-    return yy::Parser::make_INT_LIT(v, *loc);
+    yylval->build<long long>(v);
+    return Token::INT_LIT;
 }
 
 
@@ -76,49 +75,52 @@ WHITESPACE [ \t\r\n]+
             default: c = yytext[2];
         }
     }
-    return yy::Parser::make_CHAR_LIT(c, *loc);
+    yylval->build<char>(c);
+    return Token::CHAR_LIT;
 }
 
 
 \"([^"\\]|\\.)*\" {     // Строковый литерал: "hello", "a\nb" и тд
     std::string s(yytext + 1, yyleng - 2);
-    return yy::Parser::make_STRING_LIT(s, *loc);
+    yylval->build<std::string>(s);
+    return Token::STRING_LIT;
 }
 
 {ID} {      // идентификатор
-    return yy::Parser::make_IDENTIFIER(std::string(yytext), *loc);
+    yylval->build<std::string>(std::string(yytext));
+    return Token::IDENTIFIER;
 }
 
 
-"=="    { return yy::Parser::make_EQ(*loc); }
-"!="    { return yy::Parser::make_NE(*loc); }
-"<="    { return yy::Parser::make_LE(*loc); }
-">="    { return yy::Parser::make_GE(*loc); }
-"&&"    { return yy::Parser::make_LOG_AND(*loc); }
-"||"    { return yy::Parser::make_LOG_OR(*loc); }
-"+="    { return yy::Parser::make_PLUS_EQ(*loc); }
-"-="    { return yy::Parser::make_MINUS_EQ(*loc); }
-"*="    { return yy::Parser::make_STAR_EQ(*loc); }
-"/="    { return yy::Parser::make_SLASH_EQ(*loc); }
+"=="    { return Token::EQ; }
+"!="    { return Token::NE; }
+"<="    { return Token::LE; }
+">="    { return Token::GE; }
+"&&"    { return Token::LOG_AND; }
+"||"    { return Token::LOG_OR; }
+"+="    { return Token::PLUS_EQ; }
+"-="    { return Token::MINUS_EQ; }
+"*="    { return Token::STAR_EQ; }
+"/="    { return Token::SLASH_EQ; }
 
-"+"     { return yy::Parser::make_PLUS(*loc); }
-"-"     { return yy::Parser::make_MINUS(*loc); }
-"*"     { return yy::Parser::make_STAR(*loc); }
-"/"     { return yy::Parser::make_SLASH(*loc); }
-"&"     { return yy::Parser::make_AMP(*loc); }
-"|"     { return yy::Parser::make_PIPE(*loc); }
-"!"     { return yy::Parser::make_BANG(*loc); }
-"<"     { return yy::Parser::make_LT(*loc); }
-">"     { return yy::Parser::make_GT(*loc); }
-"="     { return yy::Parser::make_ASSIGN(*loc); }
-"("     { return yy::Parser::make_LPAREN(*loc); }
-")"     { return yy::Parser::make_RPAREN(*loc); }
-"{"     { return yy::Parser::make_LBRACE(*loc); }
-"}"     { return yy::Parser::make_RBRACE(*loc); }
-"["     { return yy::Parser::make_LBRACKET(*loc); }
-"]"     { return yy::Parser::make_RBRACKET(*loc); }
-";"     { return yy::Parser::make_SEMICOLON(*loc); }
-","     { return yy::Parser::make_COMMA(*loc); }
+"+"     { return Token::PLUS; }
+"-"     { return Token::MINUS; }
+"*"     { return Token::STAR; }
+"/"     { return Token::SLASH; }
+"&"     { return Token::AMP; }
+"|"     { return Token::PIPE; }
+"!"     { return Token::BANG; }
+"<"     { return Token::LT; }
+">"     { return Token::GT; }
+"="     { return Token::ASSIGN; }
+"("     { return Token::LPAREN; }
+")"     { return Token::RPAREN; }
+"{"     { return Token::LBRACE; }
+"}"     { return Token::RBRACE; }
+"["     { return Token::LBRACKET; }
+"]"     { return Token::RBRACKET; }
+";"     { return Token::SEMICOLON; }
+","     { return Token::COMMA; }
 
 
 {WHITESPACE}    {  } // пробелы

@@ -1,0 +1,45 @@
+i32 main(i32 argc, ptr$ ptr$ char argv) {
+    i32 i = 0;
+    i32 sum = 0;
+    bool flag = true;
+    char c = 'a';
+    i32 arr[5];
+
+    while (i < argc) {
+        prints("[");
+        printi(i);
+        prints("] ");
+
+        if (i == 0 && i < 10) {
+            prints("Program name: ");
+            prints(argv[i]);
+            prints("\n");
+        } elif (argv[i][0] == '-' || i > 15) {
+            prints("Option: ");
+            prints(argv[i]);
+            prints("\n");
+        } else {
+            prints(argv[i]);
+            prints("\n");
+        }
+
+        i += 1;
+    }
+
+    i32 j = 0;
+    while (j < 5) {
+        arr[j] = j * 2;
+        j += 1;
+    }
+
+    return sum;
+}
+
+void helper(i32 x) {
+    if (x > 0) {
+        printi(x);
+    } else {
+        printi(0);
+    }
+    return;
+}

@@ -27,8 +27,7 @@ int main(int argc, char** argv) {
 
     yy::lang_lexer lexer(file);
     yy::Parser parser(lexer);
-    THE_LEXER = &lexer;
-    int result = parser.parse();
+    parser.parse();
 
     if (lexical_errors > 0 || syntax_errors > 0) {
         std::cerr << "Errors: lexical=" << lexical_errors

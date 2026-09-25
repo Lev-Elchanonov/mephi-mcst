@@ -1,0 +1,8 @@
+i32 main() {
+    if (1) {
+        return 0;
+    } elif {
+        return 1;
+    }
+    return 2;
+}

@@ -1,0 +1,13 @@
+void swap(ptr$ i32 a, ptr$ i32 b) {
+    i32 tmp = a[0];
+    a[0] = b[0];
+    b[0] = tmp;
+    return;
+}
+
+i32 main() {
+    i32 x = 1;
+    i32 y = 2;
+    swap(x, y);
+    return x;
+}

@@ -7,3 +7,6 @@ cmake-build-*/
 .idea/
 .vscode/
 tasks/
+frontend/src/location.hh
+frontend/src/parser.tab.cpp
+frontend/src/parser.tab.hpp

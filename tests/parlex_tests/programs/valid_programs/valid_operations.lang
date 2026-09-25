@@ -1,0 +1,27 @@
+i32 main() {
+    i32 a = 10;
+    i32 b = 3;
+
+    i32 sum  = a + b;
+    i32 diff = a - b;
+    i32 prod = a * b;
+    i32 quot = a / b;
+
+    bool eq = (a == b);
+    bool ne = (a != b);
+    bool lt = (a < b);
+    bool le = (a <= b);
+    bool gt = (a > b);
+    bool ge = (a >= b);
+
+    bool land = eq && ne;
+    bool lor  = lt || gt;
+    bool lnot = !eq;
+
+    a += 1;
+    b -= 1;
+    a *= 2;
+    b /= 2;
+
+    return a;
+}

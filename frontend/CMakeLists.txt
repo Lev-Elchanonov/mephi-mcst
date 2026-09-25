@@ -17,19 +17,28 @@ bison_target(Parser
 
 add_flex_bison_dependency(Lexer Parser)
 
-
-add_executable(lang
-        main.cpp
+add_library(lang_lib STATIC
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
 )
 
-
-target_include_directories(lang PRIVATE
+target_include_directories(lang_lib PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 
-# Генерированный flex/bison код часто имеет неиспользуемые функции — глушим warning
-# target_compile_options(lang PRIVATE -Wno-unused-function)
+
+target_include_directories(lang_lib PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+add_executable(lang
+        main.cpp
+)
+
+target_link_libraries(lang PRIVATE lang_lib)
+
+
+target_compile_options(lang_lib PRIVATE -Wno-overloaded-virtual -Wno-unused-but-set-variable)

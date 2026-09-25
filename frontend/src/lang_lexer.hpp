@@ -22,7 +22,7 @@ namespace yy {
         }
         ~lang_lexer() override { delete istr_; }
 
-        yy::Parser::symbol_type yylex(yy::Parser::location_type* yylloc);
+        int yylex(yy::Parser::semantic_type* yylval, yy::location* loc);
 
     };
 }

@@ -15,9 +15,8 @@
     namespace yy { class lang_lexer; }
 }
 
-%code provides{
-    extern yy::lang_lexer* THE_LEXER;
-}
+
+
 // тут код, который попадает в parser.tab.cpp
 %code {
     #include <iostream>
@@ -33,32 +32,31 @@
         syntax_errors++;
     }
 
-    yy::lang_lexer* THE_LEXER = nullptr;
-    yy::Parser::location_type THE_LOC;
-
-    static yy::Parser::symbol_type yylex() {
-        return THE_LEXER->yylex(&THE_LOC);
+    static int yylex(yy::Parser::semantic_type* yylval, yy::location* loc, yy::lang_lexer& lexer) {
+            return lexer.yylex(yylval, loc);
     }
+
+
 
 
 }
 
 // Тут настройки парсера
-%define api.namespace { yy }
 %define api.parser.class { Parser }
-%define api.token.constructor
+%define api.namespace { yy }
 %define api.value.type variant
 %define parse.error verbose     // подробные сообщения об ошибках
+%define parse.trace
+
 
 
 %locations // для отслеживания позиции
 
 // передача лексера в парсер
-//%lex-param  { yy::lang_lexer& lexer }
+%lex-param  { yy::lang_lexer& lexer }
 %parse-param { yy::lang_lexer& lexer }
 
-// Токены
-%token EOF 0
+
 
 %token I32 BOOL CHAR VOID PTR
 %token IF ELIF ELSE WHILE RETURN BREAK CONTINUE
@@ -113,6 +111,7 @@
 %type <std::shared_ptr<ast::func_decl>> func_def
 // func_def - одно объявление функции целиком
 
+%type <std::vector<size_t>> array_dims array_dims_nonempty
 
 // задание приоритетов операторов
 // тут задание идет от низкого к высокому
@@ -145,12 +144,14 @@ func_def_list:
     {
         program->functions_.push_back($2);
     }
-    | func_def_list error
+    | func_def_list error func_def
     {
-        // при синтаксической ошибке восстанавливаем автомат
+        // проглотили мусор и нашли следующую функцию
+        program->functions_.push_back($3);
         yyerrok;
         yyclearin;
     }
+
 ;
 
 // объявление одной функции
@@ -184,6 +185,17 @@ param_list:
         $1.push_back($3);
         $$ = $1;
     }
+    | param_list error COMMA
+    {
+        yyerrok;
+        yyclearin;
+        $$ = $1;
+    }
+    | param_list error RPAREN
+    {
+        yyerrok;
+        $$ = $1;
+    }
 ;
 
 param:
@@ -202,21 +214,6 @@ type_spec:
     {
         // это правило ptr$ <type>
         $$ = ast::type{ast::type_kind::POINTER, std::make_shared<ast::type>($2), 0};
-    }
-    | type_spec STAR
-    {
-        // <type>* - постфиксный указатель (c-style)
-        $$ = ast::type{ast::type_kind::POINTER, std::make_shared<ast::type>($1), 0};
-    }
-    | type_spec LBRACKET INT_LIT RBRACKET
-    {
-        // <type>[N] - массив фиксированного размера
-         $$ = ast::type{ast::type_kind::ARRAY, std::make_shared<ast::type>($1), (size_t)$3};
-    }
-    | type_spec LBRACKET RBRACKET
-    {
-        // <type>[] — массив неизвестного размера
-        $$ = ast::type{ast::type_kind::ARRAY, std::make_shared<ast::type>($1), 0};
     }
 ;
 
@@ -243,6 +240,13 @@ stmt_list:
     | stmt_list stmt
     {
         $1.push_back($2);
+        $$ = $1;
+    }
+    | stmt_list error SEMICOLON
+    {
+        // кушаем плохую инструкцию до ;
+        yyerrok;
+        yyclearin;
         $$ = $1;
     }
 ;
@@ -302,73 +306,60 @@ simple_stmt:
     }
 
     // присваивание: a = expr;
-    | IDENTIFIER ASSIGN expr SEMICOLON
+    | primary_expr ASSIGN expr SEMICOLON
     {
         auto st = std::make_shared<ast::stmt>();
         st->kind_ = ast::stmt_kind::ASSIGN;
         st->line_ = @2.begin.line;
-
-        auto target = std::make_shared<ast::expr>();
-        target->kind_ = ast::expr_kind::VAR_REF;
-        target->name_ = $1;
-        target->line_ = @1.begin.line;
-        target->column_ = @1.begin.column;
-
-        st->target_ = target;
+        st->target_ = $1;
         st->value_ = $3;
         $$ = st;
     }
 
     // +=
-    | IDENTIFIER PLUS_EQ expr SEMICOLON
+    | primary_expr PLUS_EQ expr SEMICOLON
     {
         auto st = std::make_shared<ast::stmt>();
         st->kind_ = ast::stmt_kind::ASSIGN_OP;
         st->assign_op_ = ast::binary_op::ADD;
         st->line_ = @2.begin.line;
-
-        auto target = std::make_shared<ast::expr>();
-        target->kind_ = ast::expr_kind::VAR_REF;
-        target->name_ = $1;
-        target->line_ = @1.begin.line;
-
-        st->target_ = target;
+        st->target_ = $1;
         st->value_ = $3;
         $$ = st;
     }
 
     // *=
-    | IDENTIFIER STAR_EQ expr SEMICOLON
+    | primary_expr STAR_EQ expr SEMICOLON
     {
         auto st = std::make_shared<ast::stmt>();
         st->kind_ = ast::stmt_kind::ASSIGN_OP;
         st->assign_op_ = ast::binary_op::MUL;
         st->line_ = @2.begin.line;
-
-        auto target = std::make_shared<ast::expr>();
-        target->kind_ = ast::expr_kind::VAR_REF;
-        target->name_ = $1;
-        target->line_ = @1.begin.line;
-
-        st->target_ = target;
+        st->target_ = $1;
         st->value_ = $3;
         $$ = st;
     }
 
     // /=
-    | IDENTIFIER SLASH_EQ expr SEMICOLON
+    | primary_expr SLASH_EQ expr SEMICOLON
     {
         auto st = std::make_shared<ast::stmt>();
         st->kind_ = ast::stmt_kind::ASSIGN_OP;
         st->assign_op_ = ast::binary_op::DIV;
         st->line_ = @2.begin.line;
+        st->target_ = $1;
+        st->value_ = $3;
+        $$ = st;
+    }
 
-        auto target = std::make_shared<ast::expr>();
-        target->kind_ = ast::expr_kind::VAR_REF;
-        target->name_ = $1;
-        target->line_ = @1.begin.line;
-
-        st->target_ = target;
+    // -=
+    | primary_expr MINUS_EQ expr SEMICOLON
+    {
+        auto st = std::make_shared<ast::stmt>();
+        st->kind_ = ast::stmt_kind::ASSIGN_OP;
+        st->assign_op_ = ast::binary_op::SUB;
+        st->line_ = @2.begin.line;
+        st->target_ = $1;
         st->value_ = $3;
         $$ = st;
     }
@@ -376,26 +367,79 @@ simple_stmt:
 
 // объявление переменной
 var_decl:
-    type_spec IDENTIFIER // (i32 x)
+    type_spec IDENTIFIER array_dims
     {
         auto st = std::make_shared<ast::stmt>();
         st->kind_ = ast::stmt_kind::VAR_DECL;
-        st->var_type_ = $1;
         st->name_ = $2;
         st->line_ = @2.begin.line;
         st->column_ = @2.begin.column;
+
+        if ($3.empty()) {
+            st->var_type_ = $1;
+        } else {
+            ast::type arr = $1;
+            for (auto it = $3.rbegin(); it != $3.rend(); ++it) {
+                arr = ast::type{ast::type_kind::ARRAY,
+                                std::make_shared<ast::type>(arr),
+                                *it};
+            }
+            st->var_type_ = arr;
+        }
         $$ = st;
     }
-    | type_spec IDENTIFIER ASSIGN expr // (i32 x = 2)
+    | type_spec IDENTIFIER array_dims ASSIGN expr
     {
         auto st = std::make_shared<ast::stmt>();
         st->kind_ = ast::stmt_kind::VAR_DECL;
-        st->var_type_ = $1;
         st->name_ = $2;
-        st->init_value_ = $4;
         st->line_ = @2.begin.line;
         st->column_ = @2.begin.column;
+
+        if ($3.empty()) {
+            st->var_type_ = $1;
+        } else {
+            ast::type arr = $1;
+            for (auto it = $3.rbegin(); it != $3.rend(); ++it) {
+                arr = ast::type{ast::type_kind::ARRAY,
+                                std::make_shared<ast::type>(arr),
+                                *it};
+            }
+            st->var_type_ = arr;
+        }
+
+        st->init_value_ = $5;
         $$ = st;
+    }
+;
+
+
+// размерности составных массивов (обычных тоже)
+array_dims:
+    %empty      { $$ = {}; }
+    | array_dims_nonempty
+    {
+        $$ = $1;
+    }
+;
+array_dims_nonempty:
+    LBRACKET INT_LIT RBRACKET
+    {
+        $$ = { (size_t)$2 };
+    }
+    | array_dims_nonempty LBRACKET INT_LIT RBRACKET
+    {
+        $1.push_back((size_t)$3);
+        $$ = $1;
+    }
+    | LBRACKET RBRACKET
+    {
+        $$ = { 0 };
+    }
+    | array_dims_nonempty LBRACKET RBRACKET
+    {
+        $1.push_back(0);
+        $$ = $1;
     }
 ;
 
@@ -420,6 +464,25 @@ compound_stmt:
         st->line_ = @1.begin.line;
         $$ = st;
     }
+    | IF LPAREN expr RPAREN block ELIF LPAREN expr RPAREN block opt_elif_else
+    {
+        // разворачиваем elif в else { if (...) { ... } }
+        auto inner = std::make_shared<ast::stmt>();
+        inner->kind_ = ast::stmt_kind::IF;
+        inner->condition_ = $8;
+        inner->then_body_ = $10;
+        inner->else_body_ = $11;
+        inner->line_ = @7.begin.line;
+
+        auto st = std::make_shared<ast::stmt>();
+        st->kind_ = ast::stmt_kind::IF;
+        st->condition_ = $3;
+        st->then_body_ = $5;
+        st->else_body_ = { inner };
+        st->line_ = @1.begin.line;
+        $$ = st;
+    }
+
     | WHILE LPAREN expr RPAREN block // while (cond) { ... }
     {
         auto st = std::make_shared<ast::stmt>();
@@ -678,20 +741,15 @@ primary_expr:
         e->line_ = @1.begin.line;
         $$ = e;
     }
-    // индексация: arr[i]
-    | IDENTIFIER LBRACKET expr RBRACKET
+    // индексация: arr[i] или arr[i][j]
+    | primary_expr LBRACKET expr RBRACKET
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::INDEX;
         e->line_ = @1.begin.line;
 
-        auto base = std::make_shared<ast::expr>();
-        base->kind_ = ast::expr_kind::VAR_REF;
-        base->name_ = $1;
-        base->line_ = @1.begin.line;
-
-        e->lhs_ = base;      // массив
-        e->rhs_ = $3;        // индекс
+        e->lhs_ = $1;
+        e->rhs_ = $3;
         $$ = e;
     }
     | LPAREN expr RPAREN
@@ -713,6 +771,12 @@ arg_list:
     | arg_list COMMA expr
     {
         $1.push_back($3);
+        $$ = $1;
+    }
+    | arg_list error COMMA
+    {
+        yyerrok;
+        yyclearin;
         $$ = $1;
     }
 ;
