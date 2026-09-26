@@ -6,6 +6,8 @@
 // тут код, который будет в hpp файле parser.tab.hpp
 // он тут нужен для подключения в ast.hpp
 
+// code requires попадет в parser.tab.hpp. Это надо чтобы бизон мог сгенерировать объявления,
+// в которых упоминается lang_lexer
 %code requires{
     #include <memory>
     #include <string>
@@ -27,37 +29,36 @@
 
     std::shared_ptr<ast::program> program;
 
+    // функция вывода синтаксической ошибки
     void yy::Parser::error(const location_type& loc, const std::string& msg){
         std::cerr << "SYNTAX ERROR (line " << loc.begin.line<< "): " << msg << std::endl;
         syntax_errors++;
     }
 
+    // yylex - функция, котрую вызывает бизон, когда ему нужен следующий токен
     static int yylex(yy::Parser::semantic_type* yylval, yy::location* loc, yy::lang_lexer& lexer) {
             return lexer.yylex(yylval, loc);
     }
 
-
-
-
 }
 
 // Тут настройки парсера
-%define api.parser.class { Parser }
-%define api.namespace { yy }
-%define api.value.type variant
+%define api.parser.class { Parser } // задает имя класса парсера
+%define api.namespace { yy } // задает его пространство имен
+%define api.value.type variant // задает тип хранения значений токенов и нетерминалов (есть INT_LIT, STRING_LIT и тд)
 %define parse.error verbose     // подробные сообщения об ошибках
-%define parse.trace
+%define parse.trace  // трассировка парсера
 
 
 
 %locations // для отслеживания позиции
 
 // передача лексера в парсер
-%lex-param  { yy::lang_lexer& lexer }
-%parse-param { yy::lang_lexer& lexer }
+%lex-param  { yy::lang_lexer& lexer } // добавляет lexer в вызов yylex
+%parse-param { yy::lang_lexer& lexer } // добавялет параметр lexer в конструктор парсера
 
 
-
+// Объявления всех токенов
 %token I32 BOOL CHAR VOID PTR
 %token IF ELIF ELSE WHILE RETURN BREAK CONTINUE
 
@@ -105,17 +106,22 @@
 // param - структура с type_и name_
 
 %type <std::vector<ast::param>> param_list opt_param_list
-// param_list - непустой список параметров (i32 a, bool b)
+// param_list - непустой список параметров (i32 a, bool b) (сигнатура функции)
 // opt_param_list - список или пусто (для foo() без параметров)
 
 %type <std::shared_ptr<ast::func_decl>> func_def
 // func_def - одно объявление функции целиком
 
 %type <std::vector<size_t>> array_dims array_dims_nonempty
+// array_dims - размерности массива (может быть 0, если переменная типа i32 a;)
+// array_dims_nonempty - размерности либо одномерного массива, либо многомерного
+
 
 // задание приоритетов операторов
 // тут задание идет от низкого к высокому
 // логические - самые слабые, потом сравнения, потом арифметика, потом унарные, потом скобки и вызовы
+// %left - это для a OP b OP c -> (a OP b) OP c
+// %right - это для !!x -> !(!x), --x -> -(-x)
 %left LOG_OR
 %left LOG_AND
 %left AMP PIPE
@@ -130,8 +136,9 @@
 
 %%
 
+// старт синтаксического анализа
 program:
-    func_def_list
+    func_def_list // натыкаемся на список функций. Потом будем его раскрывать в другом правиле
     {
 
     }
@@ -139,12 +146,12 @@ program:
 
 // список объявлений функций
 func_def_list:
-    %empty
-    | func_def_list func_def
+    %empty // список пуст
+    | func_def_list func_def // добавить функцию в список функций
     {
         program->functions_.push_back($2);
     }
-    | func_def_list error func_def
+    | func_def_list error func_def // восстановление если в функции ошибка
     {
         // проглотили мусор и нашли следующую функцию
         program->functions_.push_back($3);
@@ -156,7 +163,7 @@ func_def_list:
 
 // объявление одной функции
 func_def:
-    type_spec IDENTIFIER LPAREN opt_param_list RPAREN block
+    type_spec IDENTIFIER LPAREN opt_param_list RPAREN block // i32 foo(i32 a, bool b) block
     {
         auto func = std::make_shared<ast::func_decl>();
         func->return_type_ = $1;
@@ -180,12 +187,12 @@ param_list:
     {
         $$ = { $1 };
     }
-    | param_list COMMA param
+    | param_list COMMA param // добавляем все параметры по очереди в param_list
     {
         $1.push_back($3);
         $$ = $1;
     }
-    | param_list error COMMA
+    | param_list error COMMA // восстановления в случае синтаксической ошибки
     {
         yyerrok;
         yyclearin;
@@ -198,6 +205,7 @@ param_list:
     }
 ;
 
+// правило для одного конкретного параметра
 param:
     type_spec IDENTIFIER
     {
@@ -205,18 +213,19 @@ param:
     }
 ;
 
+// нетерминал, описывающий тип объявления
 type_spec:
     base_type
     {
         $$ = $1;
     }
-    | PTR type_spec
+    | PTR type_spec // если у нас ptr$ i32
     {
-        // это правило ptr$ <type>
         $$ = ast::type{ast::type_kind::POINTER, std::make_shared<ast::type>($2), 0};
     }
 ;
 
+// правило для базового типа (i32, bool, char, void)
 base_type:
     I32     { $$ = ast::type{ast::type_kind::I32, nullptr, 0}; }
     | BOOL  { $$ = ast::type{ast::type_kind::BOOL, nullptr, 0}; }
@@ -232,17 +241,18 @@ block:
     }
 ;
 
+// список правил
 stmt_list:
-    %empty
+    %empty // либо правил нет if (...) { пусто }
     {
         $$ = {};
     }
-    | stmt_list stmt
+    | stmt_list stmt // сворачиваем правила в список правил
     {
         $1.push_back($2);
         $$ = $1;
     }
-    | stmt_list error SEMICOLON
+    | stmt_list error SEMICOLON // если ошибка, то восстанавливаем автомат
     {
         // кушаем плохую инструкцию до ;
         yyerrok;
@@ -251,6 +261,9 @@ stmt_list:
     }
 ;
 
+// правило может быть простой конструкцией и составной
+// simple_stmt -> i32 x = 5, x = 10, foo(), continue
+// compound_stmt -> if (x > 0) { ... }, { ... }, while
 stmt:
     simple_stmt             { $$ = $1; }
     | compound_stmt         { $$ = $1; }
@@ -258,6 +271,7 @@ stmt:
 
 // простые конструкции
 simple_stmt:
+    // объявления переменной
     var_decl SEMICOLON  { $$ = $1; }
 
     // выражение как инструкция: foo()
@@ -367,7 +381,7 @@ simple_stmt:
 
 // объявление переменной
 var_decl:
-    type_spec IDENTIFIER array_dims
+    type_spec IDENTIFIER array_dims // i32 x, i32 arr[3] и тд
     {
         auto st = std::make_shared<ast::stmt>();
         st->kind_ = ast::stmt_kind::VAR_DECL;
@@ -375,20 +389,19 @@ var_decl:
         st->line_ = @2.begin.line;
         st->column_ = @2.begin.column;
 
-        if ($3.empty()) {
+        if ($3.empty()) { // есди нет размерностей то это просто переменная i32 x, к примеру
             st->var_type_ = $1;
-        } else {
+        } else { // есди есть размерности, то надо обработать как массив
             ast::type arr = $1;
             for (auto it = $3.rbegin(); it != $3.rend(); ++it) {
-                arr = ast::type{ast::type_kind::ARRAY,
-                                std::make_shared<ast::type>(arr),
-                                *it};
+                // добавляем по размерности начиная с конца (массив массивов массивов и тд)
+                arr = ast::type{ast::type_kind::ARRAY, std::make_shared<ast::type>(arr), *it};
             }
             st->var_type_ = arr;
         }
         $$ = st;
     }
-    | type_spec IDENTIFIER array_dims ASSIGN expr
+    | type_spec IDENTIFIER array_dims ASSIGN expr //i32 dims[5] = x; (присваивание)
     {
         auto st = std::make_shared<ast::stmt>();
         st->kind_ = ast::stmt_kind::VAR_DECL;
@@ -408,7 +421,7 @@ var_decl:
             st->var_type_ = arr;
         }
 
-        st->init_value_ = $5;
+        st->init_value_ = $5; // добавляется начальное значение переменной
         $$ = st;
     }
 ;
@@ -422,21 +435,23 @@ array_dims:
         $$ = $1;
     }
 ;
+
+// непустые размерности массивов
 array_dims_nonempty:
-    LBRACKET INT_LIT RBRACKET
+    LBRACKET INT_LIT RBRACKET // int размерность
     {
         $$ = { (size_t)$2 };
     }
-    | array_dims_nonempty LBRACKET INT_LIT RBRACKET
+    | array_dims_nonempty LBRACKET INT_LIT RBRACKET // собираем все размерности в список
     {
         $1.push_back((size_t)$3);
         $$ = $1;
     }
-    | LBRACKET RBRACKET
+    | LBRACKET RBRACKET // если просто [], то размер = 0.
     {
         $$ = { 0 };
     }
-    | array_dims_nonempty LBRACKET RBRACKET
+    | array_dims_nonempty LBRACKET RBRACKET // если уже были собраны размерности и встречается [], то новая размерность имеет size = 0
     {
         $1.push_back(0);
         $$ = $1;
@@ -464,7 +479,7 @@ compound_stmt:
         st->line_ = @1.begin.line;
         $$ = st;
     }
-    | IF LPAREN expr RPAREN block ELIF LPAREN expr RPAREN block opt_elif_else
+    | IF LPAREN expr RPAREN block ELIF LPAREN expr RPAREN block opt_elif_else // if(){} elif(){}
     {
         // разворачиваем elif в else { if (...) { ... } }
         auto inner = std::make_shared<ast::stmt>();
@@ -505,7 +520,7 @@ compound_stmt:
 opt_elif_else:
     %empty                      { $$ = {}; }
     | ELSE block                { $$ = $2; }
-    | ELIF LPAREN expr RPAREN block opt_elif_else
+    | ELIF LPAREN expr RPAREN block opt_elif_else // раскрываем еще один elif
     {
         auto inner = std::make_shared<ast::stmt>();
         inner->kind_ = ast::stmt_kind::IF;
@@ -522,8 +537,13 @@ expr:
 ;
 
 binary_expr:
-unary_expr
-    | binary_expr PLUS binary_expr
+unary_expr // это для свертки. Любая binary expr сначала unary expr
+// например: a + b:
+// a -> unary_expr -> binary_expr
+// + -> PLUS
+// b -> unary_expr -> binary_expr
+// a + b -> binary_expr + binary_expr
+    | binary_expr PLUS binary_expr // a + b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -533,7 +553,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr MINUS binary_expr
+    | binary_expr MINUS binary_expr // a - b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -543,7 +563,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr STAR binary_expr
+    | binary_expr STAR binary_expr // a * b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -553,7 +573,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr SLASH binary_expr
+    | binary_expr SLASH binary_expr // a / b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -563,7 +583,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr EQ binary_expr
+    | binary_expr EQ binary_expr // a == b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -573,7 +593,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr NE binary_expr
+    | binary_expr NE binary_expr // a != b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -583,7 +603,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr LT binary_expr
+    | binary_expr LT binary_expr // a < b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -593,7 +613,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr GT binary_expr
+    | binary_expr GT binary_expr // a > b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -603,7 +623,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr LE binary_expr
+    | binary_expr LE binary_expr // a <= b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -613,7 +633,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr GE binary_expr
+    | binary_expr GE binary_expr // a >= b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -623,7 +643,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr LOG_AND binary_expr
+    | binary_expr LOG_AND binary_expr // a && b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -633,7 +653,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr LOG_OR binary_expr
+    | binary_expr LOG_OR binary_expr // a || b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -643,7 +663,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr AMP binary_expr
+    | binary_expr AMP binary_expr // a & b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -653,7 +673,7 @@ unary_expr
         e->line_ = @2.begin.line;
         $$ = e;
     }
-    | binary_expr PIPE binary_expr
+    | binary_expr PIPE binary_expr // a | b
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BIN_OP;
@@ -667,8 +687,9 @@ unary_expr
 
 // унарные выражения
 unary_expr:
+// unary_expr это либо primary_expr, либо оператор над unary_expr
     primary_expr
-    | MINUS unary_expr %prec UMINUS
+    | MINUS unary_expr %prec UMINUS // - -x
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::UN_OP;
@@ -689,9 +710,9 @@ unary_expr:
 ;
 
 
-
+// базовое выражение
 primary_expr:
-    INT_LIT
+    INT_LIT // int литерал
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::INT_LIT;
@@ -699,7 +720,7 @@ primary_expr:
         e->line_ = @1.begin.line;
         $$ = e;
     }
-    | BOOL_LIT
+    | BOOL_LIT // bool
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::BOOL_LIT;
@@ -707,7 +728,7 @@ primary_expr:
         e->line_ = @1.begin.line;
         $$ = e;
     }
-    | CHAR_LIT
+    | CHAR_LIT // char
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::CHAR_LIT;
@@ -715,7 +736,7 @@ primary_expr:
         e->line_ = @1.begin.line;
         $$ = e;
     }
-    | STRING_LIT
+    | STRING_LIT // string
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::STRING_LIT;
@@ -723,7 +744,7 @@ primary_expr:
         e->line_ = @1.begin.line;
         $$ = e;
     }
-    | IDENTIFIER
+    | IDENTIFIER // id (ссылка на переменную)
     {
         auto e = std::make_shared<ast::expr>();
         e->kind_ = ast::expr_kind::VAR_REF;
@@ -752,28 +773,30 @@ primary_expr:
         e->rhs_ = $3;
         $$ = e;
     }
-    | LPAREN expr RPAREN
+    | LPAREN expr RPAREN // (a + b)
     {
         $$ = $2;
     }
 ;
 
+// необязательный список аргументов вызова функции
 opt_arg_list:
     %empty              { $$ = {}; }
     | arg_list          { $$ = $1; }
 ;
 
+// аргументы вызова функции
 arg_list:
-    expr
+    expr // один аргумент
     {
         $$ = { $1 };
     }
-    | arg_list COMMA expr
+    | arg_list COMMA expr // свертка аргументов в список
     {
         $1.push_back($3);
         $$ = $1;
     }
-    | arg_list error COMMA
+    | arg_list error COMMA // восстановление после ошибки
     {
         yyerrok;
         yyclearin;

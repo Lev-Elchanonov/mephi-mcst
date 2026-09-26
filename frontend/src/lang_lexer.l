@@ -81,7 +81,7 @@ WHITESPACE [ \t\r\n]+
 
 
 \"([^"\\]|\\.)*\" {     // Строковый литерал: "hello", "a\nb" и тд
-    std::string s(yytext + 1, yyleng - 2);
+    std::string s(yytext + 1, yyleng - 2); // чтобы не учитывать ковычки в "hello", сдвигаем на 1 и leng - 2
     yylval->build<std::string>(s);
     return Token::STRING_LIT;
 }

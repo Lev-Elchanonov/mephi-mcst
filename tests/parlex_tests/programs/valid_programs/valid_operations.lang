@@ -6,6 +6,8 @@ i32 main() {
     i32 diff = a - b;
     i32 prod = a * b;
     i32 quot = a / b;
+    i32 and  = a & b;
+    i32 or   = a | b;
 
     bool eq = (a == b);
     bool ne = (a != b);
