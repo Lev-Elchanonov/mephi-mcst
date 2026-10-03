@@ -1,0 +1,6 @@
+i32 main() {
+    i32 a = 1;
+    bool b = true;
+    bool c = a == b;
+    return 0;
+}

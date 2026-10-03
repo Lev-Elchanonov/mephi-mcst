@@ -4,7 +4,8 @@
 #include "lang_lexer.hpp"
 #include "parser.tab.hpp"
 #include "ast.hpp"
-
+#include "semantic.hpp"
+#include "src/semantic.hpp"
 // Внешние переменные, определённые в lexer.l и parser.y
 extern int lexical_errors;
 extern int syntax_errors;
@@ -34,8 +35,14 @@ int main(int argc, char** argv) {
                   << ", syntax=" << syntax_errors << "\n";
         return 1;
     }
+    sema::analyzer a;
 
-    std::cout << "Parsing successful. Functions: "
-              << program->functions_.size() << "\n";
+    if (!a.analyze(program)) {
+        std::cerr << "Semantic analysis failed\n";
+        return 1;
+    }
+
+
+    std::cout << "Parsing + semantic analysis successful. Functions: " << program->functions_.size() << "\n";
     return 0;
 }

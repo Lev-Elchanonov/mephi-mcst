@@ -1,0 +1,5 @@
+i32 main() {
+    ptr$ char p;
+    i32 x = p + 1;
+    return 0;
+}

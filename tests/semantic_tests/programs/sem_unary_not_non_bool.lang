@@ -1,0 +1,5 @@
+i32 main() {
+    i32 x = 1;
+    bool b = !x;
+    return 0;
+}

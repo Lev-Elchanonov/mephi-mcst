@@ -1,0 +1,25 @@
+i32 helper(i32 x) {
+    return x + 1;
+}
+
+i32 main() {
+    i32 a = 5;
+    i32 b = a + 2;
+    bool flag = a > 0;
+    char c = 'a';
+
+    if (flag) {
+        printi(b);
+    } elif (a == 0) {
+        printi(0);
+    } else {
+        printi(-1);
+    }
+
+    while (a > 0) {
+        a -= 1;
+    }
+
+    i32 r = helper(a);
+    return r;
+}

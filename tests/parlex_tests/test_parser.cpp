@@ -5,6 +5,7 @@
 #include "lang_lexer.hpp"
 #include "parser.tab.hpp"
 #include "ast.hpp"
+#include "semantic.hpp"
 
 extern std::shared_ptr<ast::program> program;
 extern int syntax_errors;
@@ -50,6 +51,11 @@ protected:
         yy::lang_lexer lexer(file);
         yy::Parser parser(lexer);
         parser.parse();
+    }
+    void TearDown() override {
+        std::cerr.rdbuf(old_cerr_);
+        old_cerr_ = nullptr;
+        program.reset();
     }
 
 };
