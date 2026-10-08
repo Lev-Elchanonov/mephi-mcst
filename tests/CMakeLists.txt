@@ -6,7 +6,7 @@ add_subdirectory(parlex_tests)
 add_subdirectory(semantic_tests)
 
 add_executable(tests
-        test_main.cpp     # единственный main()
+        test_main.cpp
 )
 
 target_link_libraries(tests PRIVATE

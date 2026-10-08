@@ -1,5 +1,6 @@
 add_library(parlex_tests_lib OBJECT
         test_parser.cpp
+        test_ir.cpp
 )
 
 target_link_libraries(parlex_tests_lib PUBLIC

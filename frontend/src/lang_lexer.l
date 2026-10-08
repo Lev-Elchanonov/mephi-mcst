@@ -57,7 +57,7 @@ WHITESPACE [ \t\r\n]+
 "true"      { yylval->build<bool>(true);  return Token::BOOL_LIT; }
 "false"     { yylval->build<bool>(false); return Token::BOOL_LIT; }
 
-"-"?{DIGIT}+ {
+{DIGIT}+ {
     long long v = std::atoll(yytext);
     yylval->build<long long>(v);
     return Token::INT_LIT;

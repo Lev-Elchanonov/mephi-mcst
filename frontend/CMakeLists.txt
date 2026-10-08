@@ -25,6 +25,7 @@ add_library(lang_lib STATIC
 target_include_directories(lang_lib PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_BINARY_DIR}
+        ${CMAKE_SOURCE_DIR}/ir/include
 )
 
 
