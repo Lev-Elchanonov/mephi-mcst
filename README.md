@@ -35,6 +35,23 @@ cmake --build build -j
 ./build/bin/tests
 ```
 
+### Сборка IR (промежуточного представления) и CFG
+```bash
+cmake -S . -B build -DAST=ON -DIR=ON
+cmake --build build -j
+```
+
+### Запуск IR и CFG
+```bash
+# IR в текстовом виде
+./build/bin/ir_test --ir <file.lang>
+# CFG в текстовом виде
+./build/bin/ir_test --cfg <file.lang>
+# CFG в PNG (открывается автоматически)
+./build/bin/ir_test --cfg-png <file.lang>
+```
+
+
 ### Собрать все вместе
 ```bash
 cmake -S . -B build -DAST=ON -DVIEW=ON -DTESTS=ON -DSAN=ON -DDEBUG=ON
