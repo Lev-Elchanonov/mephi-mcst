@@ -281,6 +281,46 @@ namespace ir {
                     return nullptr;
                 }
                 case ast::expr_kind::BIN_OP: {
+                    if (expr->bin_op_ == ast::binary_op::LOG_AND ||
+                        expr->bin_op_ == ast::binary_op::LOG_OR) {
+
+                        bool is_and = expr->bin_op_ == ast::binary_op::LOG_AND;
+                        auto t = new_temp(expr->type_);
+
+                        {
+                            auto c = emit(op_code::CONST, expr->line_);
+                            c->result_ = t;
+                            c->const_value_.type_ = expr->type_;
+                            c->const_value_.bool_value_ = !is_and;
+                        }
+
+                        auto eval_rhs_lbl = new_label(is_and ? "and_rhs_" : "or_rhs_");
+                        auto end_lbl      = new_label(is_and ? "and_end_" : "or_end_");
+
+                        auto lhs = build_expr(expr->lhs_);
+                        if (!lhs) return nullptr;
+
+                        auto br = emit(op_code::BRANCH, expr->line_);
+                        br->args_ = { lhs };
+                        if (is_and) {
+                            br->true_label_  = eval_rhs_lbl;
+                            br->false_label_ = end_lbl;
+                        } else {
+                            br->true_label_  = end_lbl;
+                            br->false_label_ = eval_rhs_lbl;
+                        }
+
+                        emit(op_code::LABEL, expr->line_)->label_ = eval_rhs_lbl;
+                        auto rhs = build_expr(expr->rhs_);
+                        if (!rhs) return nullptr;
+
+                        auto asg = emit(op_code::ASSIGN, expr->line_);
+                        asg->args_ = { t, rhs };
+                        
+                        emit(op_code::LABEL, expr->line_)->label_ = end_lbl;
+                        return t;
+                    }
+
                     auto lhs = build_expr(expr->lhs_);
                     auto rhs = build_expr(expr->rhs_);
                     if (!lhs || !rhs) return nullptr;
@@ -312,10 +352,10 @@ namespace ir {
                     op->varargs_ = args;
                     return t;
                 }
+
                 case ast::expr_kind::INDEX: {
                     auto ptr = build_elem_ptr(expr);
-                    if (!ptr)
-                        return nullptr;
+                    if (!ptr) return nullptr;
                     auto t = new_temp(expr->type_);
                     auto op = emit(op_code::LOAD, expr->line_);
                     op->args_ = { ptr };
@@ -325,6 +365,7 @@ namespace ir {
             }
             return nullptr;
         }
+
         object_ptr build_elem_ptr(const expr_ptr& expr) {
             auto arr = build_expr(expr->lhs_);
             auto idx = build_expr(expr->rhs_);
