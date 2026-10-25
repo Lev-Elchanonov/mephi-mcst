@@ -1,4 +1,0 @@
-i32 main(){
-    i32 x=0;
-    return x + -5;
-}

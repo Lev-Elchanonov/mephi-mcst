@@ -15,6 +15,7 @@ option(AST "Build AST" OFF)
 option(IR "Build IR" OFF)
 option(LIR "Build LIR" OFF)
 option(ALL "Build ALL" OFF)
+option(CHIBICC "Build C backend for chibicc" OFF)
 
 if (ALL)
     message(STATUS "Building ALL targets")
@@ -78,6 +79,15 @@ if (LIR)
     add_subdirectory(lir)
 endif()
 
+
+if(CHIBICC)
+    if(NOT AST OR NOT IR OR NOT LIR)
+        message(FATAL_ERROR "CHIBICC requires AST, IR and LIR to be enabled. Use -DAST=ON -DIR=ON -DLIR=ON")
+    endif()
+
+    message(STATUS "Building C backend (for chibicc)")
+    add_subdirectory(for_chibicc)
+endif()
 
 # Тесты (включаются отдельным флагом)
 option(TESTS "Build tests" OFF)

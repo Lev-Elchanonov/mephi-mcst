@@ -367,7 +367,18 @@ namespace sema {
                             add_error(e->line_, e->column_, "! requires bool");
                         }
                         e->type_ = ast::type{ast::type_kind::BOOL, nullptr, 0};
+                    } else if (e->un_op_ == ast::unary_op::ADDR) {
+                        if (!e->lhs_ || (e->lhs_->kind_ != ast::expr_kind::VAR_REF &&
+                                         e->lhs_->kind_ != ast::expr_kind::INDEX)) {
+                            add_error(e->line_, e->column_, "'&' requires lvalue");
+                            e->type_ = ast::type{ast::type_kind::VOID, nullptr, 0};
+                            break;
+                                         }
+                        e->type_ = ast::type{ast::type_kind::POINTER,
+                                             std::make_shared<ast::type>(e->lhs_->type_), 0};
+                        break;
                     }
+                    
                     break;
                 }
 

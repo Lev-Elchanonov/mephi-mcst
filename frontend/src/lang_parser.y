@@ -129,6 +129,7 @@
 %left LT GT LE GE
 %left PLUS MINUS
 %left STAR SLASH
+%right UADDR
 %right UMINUS LOG_NOT
 %left LPAREN RPAREN LBRACKET RBRACKET
 
@@ -705,6 +706,15 @@ unary_expr:
         e->un_op_ = ast::unary_op::LOG_NOT;
         e->lhs_ = $2;
         e->line_ = @1.begin.line;
+        $$ = e;
+    }
+    | AMP   unary_expr %prec UADDR
+    {
+        auto e = std::make_shared<ast::expr>();
+        e->kind_  = ast::expr_kind::UN_OP;
+        e->un_op_ = ast::unary_op::ADDR;
+        e->lhs_   = $2;
+        e->line_  = @1.begin.line;
         $$ = e;
     }
 ;

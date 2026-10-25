@@ -93,12 +93,20 @@ namespace lir {
         // Загрузить объект в регистр
         operand load_to_reg(const std::string& name, size_t line) {
             auto it = slots_.find(name);
-            if (it == slots_.end())
-                return operand::imm(0, ast::type{});
+            if (it == slots_.end()) return operand::imm(0, ast::type{});
             auto& s = it->second;
 
-            if (s.kind_ == slot_kind::REGISTER) { // если уже в регистре, то возвращаем
-                return operand::reg(s.reg_name_, s.type_);
+            if (s.kind_ == slot_kind::REGISTER) return operand::reg(s.reg_name_, s.type_);
+
+            // NEW: массив → возвращаем АДРЕС, а не содержимое
+            if (s.type_.kind_ == ast::type_kind::ARRAY) {
+                std::string tmp = new_vreg();
+                lir_instruction& i = emit(lir_op::LEA, line);
+                if (s.kind_ == slot_kind::STACK)
+                    i.operands_ = { operand::reg(tmp, s.type_), operand::stack(s.offset_, s.type_) };
+                else
+                    i.operands_ = { operand::reg(tmp, s.type_), operand::global(s.hir_name_, s.type_) };
+                return operand::reg(tmp, s.type_);
             }
 
             std::string tmp = new_vreg();
@@ -155,8 +163,16 @@ namespace lir {
 
                 if (!addr && !agg) {
                     s.kind_ = slot_kind::REGISTER;
-                    s.reg_name_ = new_vreg();
-                    preload.emplace_back(p->name_, arg_off);
+                    if (f.name_ == "main" && p->name_ == "argc") {
+                        s.reg_name_ = "%r0";
+                        new_vreg();
+                    } else if (f.name_ == "main" && p->name_ == "argv") {
+                        s.reg_name_ = "%r1";
+                        new_vreg();
+                    } else {
+                        s.reg_name_ = new_vreg();
+                        preload.emplace_back(p->name_, arg_off);
+                    }
                 } else {
                     s.kind_ = slot_kind::STACK;
                     s.offset_ = arg_off;
@@ -344,11 +360,9 @@ namespace lir {
 
                 case ir::op_code::BRANCH: {
                     auto cond = load_to_reg(op.args_[0]->name_, op.line_);
-                    lir_instruction& c = emit(lir_op::CMP, op.line_);
-                    c.operands_ = { cond, operand::imm(0, cond.type_) };
 
                     lir_instruction& jz = emit(lir_op::JZ, op.line_);
-                    jz.operands_ = { operand::label(op.false_label_) };
+                    jz.operands_ = { cond, operand::label(op.false_label_) }; // два операнда
 
                     lir_instruction& jmp = emit(lir_op::JMP, op.line_);
                     jmp.operands_ = { operand::label(op.true_label_) };
@@ -374,9 +388,6 @@ namespace lir {
                     auto a = load_to_reg(op.args_[0]->name_, op.line_);
                     auto b = load_to_reg(op.args_[1]->name_, op.line_);
 
-                    lir_instruction& c = emit(lir_op::CMP, op.line_);
-                    c.operands_ = { a, b };
-
                     lir_op setcc;
                     switch (op.code_) {
                         case ir::op_code::EQ: setcc = lir_op::SET_EQ; break;
@@ -390,7 +401,7 @@ namespace lir {
 
                     std::string dst = new_vreg();
                     lir_instruction& s = emit(setcc, op.line_);
-                    s.operands_ = { operand::reg(dst, op.result_->type_) };
+                    s.operands_ = { operand::reg(dst, op.result_->type_), a, b }; // три операнда
                     store_to(op.result_->name_, operand::reg(dst, op.result_->type_), op.line_);
                     break;
                 }

@@ -331,6 +331,25 @@ namespace ir {
                     return t;
                 }
                 case ast::expr_kind::UN_OP: {
+                    if (expr->un_op_ == ast::unary_op::ADDR) {
+                        // &x
+                        if (!expr->lhs_) return nullptr;
+
+                        if (expr->lhs_->kind_ == ast::expr_kind::VAR_REF) {
+                            auto it = var_map_.find(expr->lhs_->name_);
+                            if (it == var_map_.end()) return nullptr;
+                            auto t = new_temp(expr->type_);
+                            auto op = emit(op_code::ADDR, expr->line_);
+                            op->args_   = { it->second };
+                            op->result_ = t;
+                            return t;
+                        }
+                        if (expr->lhs_->kind_ == ast::expr_kind::INDEX) {
+                            return build_elem_ptr(expr->lhs_);
+                        }
+                        return nullptr;
+                    }
+
                     auto operand = build_expr(expr->lhs_);
                     if (!operand) return nullptr;
                     auto t = new_temp(expr->type_);
@@ -356,6 +375,11 @@ namespace ir {
                 case ast::expr_kind::INDEX: {
                     auto ptr = build_elem_ptr(expr);
                     if (!ptr) return nullptr;
+
+                    if (expr->type_.kind_ == ast::type_kind::ARRAY) {
+                        return ptr;
+                    }
+
                     auto t = new_temp(expr->type_);
                     auto op = emit(op_code::LOAD, expr->line_);
                     op->args_ = { ptr };
@@ -406,6 +430,7 @@ namespace ir {
             switch (op) {
                 case ast::unary_op::NEG:     return op_code::NEG;
                 case ast::unary_op::LOG_NOT: return op_code::NOT;
+                case ast::unary_op::ADDR:    return op_code::ADDR;
             }
             return op_code::NEG;
         }

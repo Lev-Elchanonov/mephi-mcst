@@ -6,8 +6,16 @@ void swap(ptr$ i32 a, ptr$ i32 b) {
 }
 
 i32 main() {
-    i32 x = 1;
-    i32 y = 2;
+    i32 bx[1];
+    i32 by[1];
+
+    ptr$ i32 x = &bx[0];
+    ptr$ i32 y = &by[0];
+
+    x[0] = 1;
+    y[0] = 2;
+
     swap(x, y);
-    return x;
+
+    return x[0];
 }

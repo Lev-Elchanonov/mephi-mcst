@@ -24,7 +24,7 @@ namespace ast {
     };
 
     enum class unary_op {   // унарные операторы
-        NEG, LOG_NOT
+        NEG, LOG_NOT, ADDR
     };
 
     enum class expr_kind {  // выражения
